@@ -266,6 +266,11 @@ body::before { content:'';position:fixed;inset:0;background:repeating-linear-gra
       <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><polygon points="3,2 13,8 3,14" fill="currentColor" opacity=".8"/></svg>
       Executor Bridge
     </div>
+    <a class="nav-item" href="validator.html" style="text-decoration:none;border-left-color:var(--purple);background:linear-gradient(90deg,rgba(167,139,250,0.08),transparent);color:var(--purple)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" style="opacity:1"><path d="M2 12 Q4 4 8 6 Q12 8 14 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="8" cy="13" r="1.5" fill="currentColor" opacity=".6"/></svg>
+      MC Validator ↗
+      <span class="nav-badge" style="background:rgba(167,139,250,0.15);color:var(--purple)">NEW</span>
+    </a>
     <div class="sidebar-divider"></div>
     <div class="nav-section-label">Config</div>
     <div class="nav-item" onclick="navigate('risk',this)">
@@ -291,6 +296,21 @@ body::before { content:'';position:fixed;inset:0;background:repeating-linear-gra
           <button class="btn btn-teal" onclick="deployStrategies()">⬆ Deploy</button>
         </div>
       </div>
+
+      <a href="validator.html" style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;margin-bottom:16px;background:linear-gradient(90deg,rgba(167,139,250,0.10),rgba(167,139,250,0.04));border:1px solid rgba(167,139,250,0.25);border-radius:6px;text-decoration:none;transition:all 0.2s;cursor:pointer" onmouseover="this.style.borderColor='rgba(167,139,250,0.5)'" onmouseout="this.style.borderColor='rgba(167,139,250,0.25)'">
+        <div style="display:flex;align-items:center;gap:14px">
+          <div style="width:36px;height:36px;border-radius:5px;background:rgba(167,139,250,0.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M2 12 Q4 4 8 6 Q12 8 14 2" stroke="#a78bfa" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="8" cy="13" r="1.5" fill="#a78bfa" opacity=".7"/></svg>
+          </div>
+          <div>
+            <div style="font-family:'Unbounded',sans-serif;font-size:11px;font-weight:600;letter-spacing:0.08em;color:#a78bfa">MONTE CARLO VALIDATOR</div>
+            <div style="font-size:12px;color:var(--text-dim);margin-top:2px">Bootstrap MC · Sharpe · Calmar · P(ruin) · Equity distribution</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;padding:4px 10px;border-radius:3px;background:rgba(167,139,250,0.15);color:#a78bfa;letter-spacing:0.08em">OPEN ↗</span>
+        </div>
+      </a>
 
       <div class="metrics-grid">
         <div class="metric-card teal fade-in"><div class="metric-label">Signals Extracted</div><div class="metric-value teal" id="m-signals">—</div><div class="metric-change" id="m-signals-sub">Loading...</div></div>
