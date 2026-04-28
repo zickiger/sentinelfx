@@ -1,0 +1,34 @@
+# Secrets — never commit real credentials
+backend/.env
+executor/.env
+*.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+*.egg-info/
+
+# SQLite databases — generated at runtime
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Node (if frontend tooling added later)
+node_modules/

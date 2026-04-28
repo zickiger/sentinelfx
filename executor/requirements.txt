@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+pydantic
+# MetaTrader5 is Windows-only — install only if running on Windows with MT5 installed
+# MetaTrader5

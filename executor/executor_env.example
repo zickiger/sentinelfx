@@ -1,0 +1,29 @@
+# ══════════════════════════════════════════════════
+# SentinelFX Executor Bridge — Environment Variables
+# Copy to .env and fill in your values
+# ══════════════════════════════════════════════════
+
+# ── Security ──────────────────────────────────────
+# Must match the "secret" field in your TradingView alert JSON
+WEBHOOK_SECRET=change_me_to_random_string
+
+# ── MT5 Credentials ───────────────────────────────
+# Find these in MT5: Tools -> Options -> Community or your broker
+MT5_LOGIN=12345678
+MT5_PASSWORD=your_mt5_password
+MT5_SERVER=Topstep-Server
+
+# ── Prop Firm Rules ───────────────────────────────
+PROP_FIRM=Topstep SIM
+ACCOUNT_SIZE=100000
+DD_LIMIT_PCT=4.5          # Kill switch triggers at this % daily drawdown
+MAX_CONTRACTS=3
+RISK_PER_TRADE=0.5        # % of account risked per trade
+CONSISTENCY_PCT=30.0      # Max % of profit target in a single day
+
+# ── Execution ─────────────────────────────────────
+ANTI_DETECT=true          # Randomise entry by 1-2 ticks
+PORT=8080
+
+# ── Database ──────────────────────────────────────
+EXECUTOR_DB=data/executor.db

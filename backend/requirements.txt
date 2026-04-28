@@ -1,0 +1,11 @@
+# ── Python dependencies ──────────────────────────────
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+aiohttp>=3.9.0
+yfinance>=0.2.40
+pydantic>=2.7.0
+python-dotenv>=1.0.0
+websockets>=12.0
+
+# Already installed from research_sentinel:
+# pyyaml, sqlite-utils, beautifulsoup4, feedparser

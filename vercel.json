@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "name": "sentinelfx-portal",
+  "outputDirectory": "frontend",
+  "routes": [
+    { "src": "/(.*)", "dest": "/frontend/$1" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" }
+      ]
+    }
+  ]
+}
