@@ -20,14 +20,20 @@ start "SentinelFX Ollama" cmd /k "ollama serve"
 
 timeout /t 2 /nobreak >nul
 
-echo  [4/4] Launching portal...
-start "" "%~dp0frontend\index.html"
+echo  [4/5] Starting frontend HTTP server (port 3000)...
+start "SentinelFX Portal" cmd /k "cd /d %~dp0frontend && python -m http.server 3000"
+
+timeout /t 2 /nobreak >nul
+
+echo  [5/5] Opening portal in browser...
+start "" http://localhost:3000
 
 echo.
-echo  Backend  : http://localhost:8000
-echo  Executor : http://localhost:8080
-echo  Docs     : http://localhost:8080/docs
-echo  Portal   : frontend\index.html
+echo  Backend   : http://localhost:8000
+echo  Executor  : http://localhost:8080
+echo  Portal    : http://localhost:3000
+echo  Validator : http://localhost:3000/validator.html
+echo  API Docs  : http://localhost:8000/docs
 echo.
 echo  TradingView webhook URL:
 echo  http://localhost:8080/webhook  (use ngrok for public URL)

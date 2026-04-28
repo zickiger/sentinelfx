@@ -13,8 +13,13 @@
 
 const SENTINELFX_CONFIG = {
   // Auto-selects localhost for local dev, Railway URL for production.
+  // "" hostname means the page was opened as a file:// URL — treat as local.
   // After Railway deploy: replace the string below with your Railway URL.
-  BACKEND_URL: (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+  BACKEND_URL: (
+    window.location.hostname === "localhost"  ||
+    window.location.hostname === "127.0.0.1" ||
+    window.location.hostname === ""
+  )
     ? "http://localhost:8000"
     : "https://YOUR-APP.up.railway.app",
 

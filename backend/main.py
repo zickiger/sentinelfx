@@ -47,9 +47,17 @@ app = FastAPI(
     version="1.0.0"
 )
 
+_allowed_origin = os.environ.get("ALLOWED_ORIGIN", "")
+_cors_origins = (
+    [_allowed_origin] if _allowed_origin and _allowed_origin != "*"
+    else ["http://localhost:3000", "http://127.0.0.1:3000",
+          "http://localhost:8080", "null"]
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.environ.get("ALLOWED_ORIGIN", "*")],          # tighten in production
+    allow_origins=_cors_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",   # Vercel previews
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
