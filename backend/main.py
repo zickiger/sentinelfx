@@ -955,6 +955,142 @@ async def executor_account():
     return data or {"balance": 0, "equity": 0, "mode": "offline"}
 
 
+# ─────────────────────────────────────────────────────────────
+# ROUTES — MONTE CARLO VALIDATOR
+# ─────────────────────────────────────────────────────────────
+
+VALIDATOR_SCRIPT = ARCHITECT_DIR / "validator.py"
+_running_validations: set[str] = set()
+
+
+def _query_mc(sql: str, params: tuple = ()) -> list[dict]:
+    """Read from mc_results table in setups.db."""
+    return query(sql, params, DB_PATH)
+
+
+@app.get("/api/validate/results")
+async def get_mc_results(min_sharpe: float = 0.0, passed_only: bool = False):
+    """All stored MC results, joined with strategy name."""
+    sql = """
+        SELECT mc.*,
+               r.title  AS strategy_name,
+               r.source AS strategy_source
+        FROM mc_results mc
+        LEFT JOIN raw_setups r ON r.setup_id = mc.setup_id
+        WHERE mc.sharpe_mean >= ?
+    """
+    params: list = [min_sharpe]
+    if passed_only:
+        sql += " AND mc.passed = 1"
+    sql += " ORDER BY mc.sharpe_mean DESC"
+    rows = _query_mc(sql, tuple(params))
+    passed = sum(1 for r in rows if r.get("passed"))
+    return {"results": rows, "count": len(rows), "passed": passed}
+
+
+@app.get("/api/validate/{setup_id}")
+async def get_mc_result(setup_id: str):
+    """MC result for a specific strategy."""
+    rows = _query_mc(
+        """SELECT mc.*, r.title AS strategy_name
+           FROM mc_results mc
+           LEFT JOIN raw_setups r ON r.setup_id = mc.setup_id
+           WHERE mc.setup_id = ?""",
+        (setup_id,)
+    )
+    return {"result": rows[0] if rows else None,
+            "running": setup_id in _running_validations}
+
+
+@app.post("/api/validate/{setup_id}")
+async def trigger_mc_validation(setup_id: str, runs: int = 2000):
+    """Spawn validator.py as a subprocess for one strategy."""
+    if setup_id in _running_validations:
+        return {"status": "already_running", "setup_id": setup_id}
+
+    if not VALIDATOR_SCRIPT.exists():
+        raise HTTPException(
+            status_code=503,
+            detail=f"validator.py not found at {VALIDATOR_SCRIPT}"
+        )
+
+    _running_validations.add(setup_id)
+    agent_store.update_agent("validator", {
+        "status":           "testing",
+        "progress":         0,
+        "current_strategy": setup_id,
+        "mc_iterations":    0,
+        "mc_total":         runs,
+        "task":             f"MC validation: {setup_id[:8]} ({runs:,} runs)",
+    })
+    agent_store.add_log("validator", f"MC started: {setup_id[:8]} — {runs:,} iterations")
+
+    async def _run():
+        try:
+            cmd = [sys.executable, str(VALIDATOR_SCRIPT),
+                   "--validate", setup_id, "--runs", str(runs)]
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                cwd=str(ARCHITECT_DIR),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+            progress = 5
+            async for line in proc.stdout:
+                text = line.decode(errors="replace").strip()
+                if text:
+                    agent_store.add_log("validator", text[:120])
+                    progress = min(progress + 5, 95)
+                    agent_store.update_agent("validator", {
+                        "progress": progress,
+                        "task": text[:80],
+                    })
+            await proc.wait()
+            agent_store.update_agent("validator", {
+                "status": "idle", "progress": 100,
+                "task": f"MC complete: {setup_id[:8]}",
+            })
+            agent_store.add_log("validator", f"MC complete: {setup_id[:8]}")
+        except Exception as e:
+            agent_store.update_agent("validator", {"status": "error"})
+            agent_store.add_log("validator", f"MC error: {e}")
+        finally:
+            _running_validations.discard(setup_id)
+
+    asyncio.create_task(_run())
+    return {"status": "started", "setup_id": setup_id, "runs": runs}
+
+
+@app.post("/api/validate/all")
+async def trigger_mc_all(runs: int = 2000):
+    """Spawn validator.py --validate-all for all unvalidated pine_built setups."""
+    if not VALIDATOR_SCRIPT.exists():
+        raise HTTPException(status_code=503, detail="validator.py not found")
+
+    async def _run_all():
+        try:
+            cmd = [sys.executable, str(VALIDATOR_SCRIPT),
+                   "--validate-all", "--runs", str(runs)]
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                cwd=str(ARCHITECT_DIR),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+            async for line in proc.stdout:
+                text = line.decode(errors="replace").strip()
+                if text:
+                    agent_store.add_log("validator", text[:120])
+            await proc.wait()
+            agent_store.update_agent("validator", {"status": "idle", "progress": 0})
+            agent_store.add_log("validator", "Batch MC validation complete")
+        except Exception as e:
+            agent_store.add_log("validator", f"Batch MC error: {e}")
+
+    asyncio.create_task(_run_all())
+    return {"status": "started", "runs": runs}
+
+
 @app.websocket("/ws/live")
 async def websocket_live(ws: WebSocket):
     """

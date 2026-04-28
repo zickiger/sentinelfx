@@ -1236,6 +1236,18 @@ async def run_scan(source_filter: Optional[str] = None):
         db.mark_pine_built(setup.setup_id)
         console.print(f"  [teal]Pine Script:[/teal] {ppath.name}")
 
+        # Auto-queue MC validation in the background
+        validator_path = Path(__file__).parent / "validator.py"
+        if validator_path.exists():
+            subprocess.Popen(
+                [sys.executable, str(validator_path),
+                 "--validate", setup.setup_id, "--runs", "2000"],
+                cwd=str(Path(__file__).parent),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            console.print(f"  [dim]MC validator queued for {setup.setup_id[:8]}[/dim]")
+
         # Run Python backtest
         console.print(f"  [yellow]Backtesting...[/yellow]", end=" ")
         result = run_backtest(verdict)

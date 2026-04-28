@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SENTINEL FX — Monte Carlo Validator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Unbounded:wght@300;400;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="config.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg0:#07080c;--bg1:#0c0e14;--bg2:#10131c;--bg3:#151821;--bg4:#1a1e2a;
+  --border:rgba(255,255,255,0.06);--border-hi:rgba(255,255,255,0.12);
+  --text:#dde4f0;--text-dim:#5a6478;--text-mid:#8a93a8;
+  --teal:#00c896;--teal-dim:rgba(0,200,150,0.12);--teal-glow:rgba(0,200,150,0.25);
+  --blue:#4d9fff;--blue-dim:rgba(77,159,255,0.10);
+  --amber:#f5a623;--amber-dim:rgba(245,166,35,0.10);
+  --red:#ff4d6a;--red-dim:rgba(255,77,106,0.10);
+  --green:#2dd47a;--purple:#a78bfa;
+  --mono:'IBM Plex Mono',monospace;--display:'Unbounded',sans-serif;--body:'DM Sans',sans-serif;
+}
+html{font-size:15px;scroll-behavior:smooth}
+body{background:var(--bg0);color:var(--text);font-family:var(--body);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.025) 2px,rgba(0,0,0,0.025) 4px);pointer-events:none;z-index:9999}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg1)}::-webkit-scrollbar-thumb{background:var(--bg4)}
+
+/* ── Topbar ── */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;background:var(--bg1);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+.topbar-left{display:flex;align-items:center;gap:20px}
+.back-link{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;color:var(--text-dim);text-decoration:none;letter-spacing:0.06em;padding:5px 10px;border:1px solid var(--border);border-radius:3px;transition:all 0.15s}
+.back-link:hover{color:var(--teal);border-color:rgba(0,200,150,0.3)}
+.wordmark{font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:0.08em;color:#fff;display:flex;align-items:center;gap:8px}
+.wordmark-hex{width:20px;height:20px;background:var(--teal);clip-path:polygon(50% 0%,93% 25%,93% 75%,50% 100%,7% 75%,7% 25%);flex-shrink:0}
+.wordmark span{color:var(--teal)}
+.page-title{font-family:var(--mono);font-size:11px;color:var(--text-mid);letter-spacing:0.08em}
+.topbar-right{display:flex;align-items:center;gap:16px}
+.conn-dot{width:7px;height:7px;border-radius:50%;background:var(--text-dim);transition:background 0.3s}
+.conn-dot.live{background:var(--teal);animation:blink 2.4s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+.conn-label{font-family:var(--mono);font-size:10px;color:var(--text-dim);letter-spacing:0.04em}
+
+/* ── Layout ── */
+.page{max-width:1400px;margin:0 auto;padding:24px}
+
+/* ── Controls bar ── */
+.controls{display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap}
+.strategy-select{flex:1;min-width:280px;background:var(--bg2);border:1px solid var(--border-hi);color:var(--text);font-family:var(--mono);font-size:12px;padding:9px 14px;border-radius:4px;outline:none;cursor:pointer}
+.strategy-select:focus{border-color:var(--teal)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;font-size:12px;font-family:var(--body);font-weight:500;border-radius:4px;cursor:pointer;transition:all 0.15s;border:none;letter-spacing:0.01em;white-space:nowrap}
+.btn-teal{background:var(--teal);color:#000}
+.btn-teal:hover{background:#00e6ac;transform:translateY(-1px)}
+.btn-teal:disabled{opacity:0.4;cursor:not-allowed;transform:none}
+.btn-ghost{background:transparent;color:var(--text-mid);border:1px solid var(--border-hi)}
+.btn-ghost:hover{border-color:var(--teal);color:var(--teal)}
+.run-status{font-family:var(--mono);font-size:11px;color:var(--text-dim);letter-spacing:0.04em}
+.run-status.running{color:var(--amber);animation:blink 1.5s infinite}
+.run-status.done{color:var(--teal)}
+.run-status.error{color:var(--red)}
+.runs-input{width:90px;background:var(--bg2);border:1px solid var(--border-hi);color:var(--text);font-family:var(--mono);font-size:12px;padding:9px 12px;border-radius:4px;outline:none}
+.runs-input:focus{border-color:var(--teal)}
+
+/* ── Empty state ── */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:80px 24px;text-align:center;border:1px dashed var(--border-hi);border-radius:8px;margin-top:20px}
+.empty-icon{font-size:40px;opacity:0.3}
+.empty-title{font-family:var(--display);font-size:13px;font-weight:600;letter-spacing:0.1em;color:var(--text-mid)}
+.empty-sub{font-size:13px;color:var(--text-dim);line-height:1.6;max-width:480px}
+.empty-cmd{font-family:var(--mono);font-size:11px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:10px 16px;color:var(--teal);margin-top:4px}
+
+/* ── Verdict banner ── */
+.verdict-banner{display:flex;align-items:center;gap:16px;padding:14px 20px;border-radius:6px;margin-bottom:20px;border:1px solid}
+.verdict-banner.pass{background:rgba(0,200,150,0.07);border-color:rgba(0,200,150,0.25)}
+.verdict-banner.fail{background:rgba(255,77,106,0.07);border-color:rgba(255,77,106,0.25)}
+.verdict-badge{font-family:var(--display);font-size:11px;font-weight:700;letter-spacing:0.12em;padding:5px 12px;border-radius:3px}
+.verdict-badge.pass{background:var(--teal-dim);color:var(--teal)}
+.verdict-badge.fail{background:var(--red-dim);color:var(--red)}
+.verdict-info{flex:1}
+.verdict-name{font-size:14px;font-weight:500;color:var(--text);margin-bottom:3px}
+.verdict-reason{font-family:var(--mono);font-size:11px;color:var(--text-dim)}
+.verdict-meta{font-family:var(--mono);font-size:10px;color:var(--text-dim);text-align:right;line-height:1.8}
+
+/* ── Metrics grid ── */
+.metrics-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px}
+@media(max-width:1100px){.metrics-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:700px){.metrics-grid{grid-template-columns:repeat(2,1fr)}}
+.metric-card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:14px 16px;position:relative;overflow:hidden}
+.metric-card::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent,var(--teal)),transparent);opacity:0.5}
+.metric-card.teal{--accent:var(--teal)}.metric-card.blue{--accent:var(--blue)}.metric-card.amber{--accent:var(--amber)}.metric-card.red{--accent:var(--red)}.metric-card.green{--accent:var(--green)}.metric-card.purple{--accent:var(--purple)}
+.metric-label{font-family:var(--mono);font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px}
+.metric-value{font-family:var(--mono);font-size:22px;font-weight:500;line-height:1;color:var(--text)}
+.metric-value.teal{color:var(--teal)}.metric-value.blue{color:var(--blue)}.metric-value.amber{color:var(--amber)}.metric-value.red{color:var(--red)}.metric-value.green{color:var(--green)}
+.metric-sub{font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-top:6px}
+
+/* ── Charts ── */
+.charts-row{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-bottom:20px}
+@media(max-width:1000px){.charts-row{grid-template-columns:1fr 1fr}}
+@media(max-width:640px){.charts-row{grid-template-columns:1fr}}
+.chart-card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:16px}
+.chart-title{font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-dim);margin-bottom:12px}
+.chart-wrap{position:relative;height:180px}
+
+/* ── Results table ── */
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.section-title{font-family:var(--mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-dim)}
+.table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:40px}
+table{width:100%;border-collapse:collapse}
+th{font-family:var(--mono);font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-dim);padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);background:var(--bg3)}
+td{padding:10px 14px;font-size:12px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--bg3);cursor:pointer}
+.mono{font-family:var(--mono);font-size:11px}
+.tag{display:inline-flex;align-items:center;padding:2px 7px;border-radius:2px;font-family:var(--mono);font-size:9px;letter-spacing:0.06em;background:var(--bg4);color:var(--text-dim)}
+.tag.teal{background:var(--teal-dim);color:var(--teal)}
+.tag.red{background:var(--red-dim);color:var(--red)}
+.tag.amber{background:var(--amber-dim);color:var(--amber)}
+.tag.blue{background:var(--blue-dim);color:var(--blue)}
+.sharpe-bar{display:flex;align-items:center;gap:8px}
+.sharpe-track{width:60px;height:3px;background:var(--bg4);border-radius:2px;overflow:hidden;flex-shrink:0}
+.sharpe-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--teal));border-radius:2px}
+
+/* ── Toast ── */
+#toast-container{position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:8px;z-index:10000}
+.toast{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg3);border:1px solid var(--border-hi);border-radius:6px;min-width:260px;max-width:360px;animation:slideIn 0.25s ease;box-shadow:0 4px 20px rgba(0,0,0,0.4)}
+.toast.teal{border-left:3px solid var(--teal)}.toast.amber{border-left:3px solid var(--amber)}.toast.red{border-left:3px solid var(--red)}
+.toast-icon{font-size:14px;flex-shrink:0}
+.toast-body{flex:1}.toast-title{font-size:12px;font-weight:500;color:var(--text)}.toast-msg{font-size:11px;color:var(--text-dim);margin-top:2px}
+.toast-close{color:var(--text-dim);cursor:pointer;padding:2px 4px;font-size:14px}
+.toast.fadeOut{animation:fadeOut 0.3s ease forwards}
+@keyframes slideIn{from{transform:translateX(20px);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes fadeOut{to{transform:translateX(20px);opacity:0}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <a href="index.html" class="back-link">← Portal</a>
+    <div class="wordmark">
+      <div class="wordmark-hex"></div>
+      SENTINEL<span>FX</span>
+    </div>
+    <div class="page-title">MONTE CARLO VALIDATOR</div>
+  </div>
+  <div class="topbar-right">
+    <div class="conn-dot" id="conn-dot"></div>
+    <span class="conn-label" id="conn-label">Connecting...</span>
+  </div>
+</div>
+
+<div class="page">
+
+  <!-- Controls -->
+  <div class="controls">
+    <select class="strategy-select" id="strategy-select" onchange="onStrategyChange()">
+      <option value="">— Select a strategy to inspect —</option>
+    </select>
+    <input class="runs-input" type="number" id="runs-input" value="2000" min="500" max="20000" step="500" title="MC iterations">
+    <button class="btn btn-teal" id="run-btn" onclick="runValidation()" disabled>▶ Run MC</button>
+    <button class="btn btn-ghost" onclick="loadAllResults()">↺ Refresh</button>
+    <span class="run-status" id="run-status"></span>
+  </div>
+
+  <!-- Verdict banner (hidden until a strategy is selected) -->
+  <div class="verdict-banner" id="verdict-banner" style="display:none">
+    <span class="verdict-badge" id="verdict-badge">—</span>
+    <div class="verdict-info">
+      <div class="verdict-name" id="verdict-name">—</div>
+      <div class="verdict-reason" id="verdict-reason">—</div>
+    </div>
+    <div class="verdict-meta" id="verdict-meta">—</div>
+  </div>
+
+  <!-- Metrics grid -->
+  <div class="metrics-grid" id="metrics-grid" style="display:none">
+    <div class="metric-card teal">
+      <div class="metric-label">Sharpe (mean)</div>
+      <div class="metric-value teal" id="m-sharpe">—</div>
+      <div class="metric-sub" id="m-sharpe-range">p5 — p95</div>
+    </div>
+    <div class="metric-card blue">
+      <div class="metric-label">Sharpe p5</div>
+      <div class="metric-value blue" id="m-sharpe-p5">—</div>
+      <div class="metric-sub">5th percentile (floor)</div>
+    </div>
+    <div class="metric-card purple">
+      <div class="metric-label">Calmar (mean)</div>
+      <div class="metric-value" id="m-calmar" style="color:var(--purple)">—</div>
+      <div class="metric-sub">Ann. return / max DD</div>
+    </div>
+    <div class="metric-card amber">
+      <div class="metric-label">Max DD (mean)</div>
+      <div class="metric-value amber" id="m-maxdd">—</div>
+      <div class="metric-sub" id="m-maxdd-worst">worst: —</div>
+    </div>
+    <div class="metric-card red">
+      <div class="metric-label">P(Ruin)</div>
+      <div class="metric-value red" id="m-pruin">—</div>
+      <div class="metric-sub">% runs hitting 20% DD</div>
+    </div>
+    <div class="metric-card green">
+      <div class="metric-label">Win Rate</div>
+      <div class="metric-value green" id="m-wr">—</div>
+      <div class="metric-sub" id="m-trades">— trades detected</div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-row" id="charts-row" style="display:none">
+    <div class="chart-card">
+      <div class="chart-title">Equity Curve Distribution (40 sample runs)</div>
+      <div class="chart-wrap"><canvas id="equity-chart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Sharpe Distribution</div>
+      <div class="chart-wrap"><canvas id="sharpe-chart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Max Drawdown Distribution</div>
+      <div class="chart-wrap"><canvas id="dd-chart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Empty state (shown when no results exist) -->
+  <div class="empty-state" id="empty-state">
+    <div class="empty-icon">⬡</div>
+    <div class="empty-title">NO MC RESULTS YET</div>
+    <div class="empty-sub">
+      Generate strategies first with setup_hunter.py, then run the Monte Carlo validator.
+      Or select a strategy above and click Run MC to validate it now.
+    </div>
+    <div class="empty-cmd">cd architect &amp;&amp; python validator.py --validate-all</div>
+  </div>
+
+  <!-- All results table -->
+  <div id="results-section" style="display:none">
+    <div class="section-header">
+      <div class="section-title">All MC Results</div>
+      <span class="mono" id="results-count" style="font-size:11px;color:var(--text-dim)"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Strategy</th>
+            <th>Concept</th>
+            <th>Market</th>
+            <th>TF</th>
+            <th>Sharpe</th>
+            <th>Calmar</th>
+            <th>Max DD</th>
+            <th>P(Ruin)</th>
+            <th>Win Rate</th>
+            <th>Trades</th>
+            <th>Runs</th>
+            <th>Verdict</th>
+          </tr>
+        </thead>
+        <tbody id="results-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+<div id="toast-container"></div>
+
+<script>
+const API = SENTINELFX_CONFIG.BACKEND_URL;
+
+let equityChart = null;
+let sharpeChart = null;
+let ddChart     = null;
+let allResults  = [];
+let allStrategies = [];
+
+// ── Connection check ─────────────────────────────────────────
+async function checkConn() {
+  try {
+    const r = await fetch(`${API}/api/health`, { signal: AbortSignal.timeout(3000) });
+    const ok = r.ok;
+    document.getElementById('conn-dot').className   = 'conn-dot' + (ok ? ' live' : '');
+    document.getElementById('conn-label').textContent = ok ? 'Backend Connected' : 'Backend Offline';
+  } catch {
+    document.getElementById('conn-dot').className   = 'conn-dot';
+    document.getElementById('conn-label').textContent = 'Backend Offline';
+  }
+}
+
+// ── API helper ────────────────────────────────────────────────
+async function api(path, opts = {}) {
+  try {
+    const r = await fetch(`${API}${path}`, {
+      headers: { 'Content-Type': 'application/json' },
+      ...opts,
+    });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch {
+    return null;
+  }
+}
+
+// ── Load strategy list (pine_built setups) ────────────────────
+async function loadStrategies() {
+  const data = await api('/api/strategies');
+  if (!data) return;
+  allStrategies = data.strategies || [];
+  const sel = document.getElementById('strategy-select');
+  allStrategies.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value       = s.id;
+    opt.textContent = `${(s.name || s.id).slice(0, 50)}  [${s.type || '?'} | ${s.market || '?'} ${s.tf || '?'}]`;
+    sel.appendChild(opt);
+  });
+  document.getElementById('run-btn').disabled = allStrategies.length === 0;
+}
+
+// ── Load all MC results ───────────────────────────────────────
+async function loadAllResults() {
+  const data = await api('/api/validate/results');
+  if (!data) { showToast('Error', 'Could not reach backend', 'red'); return; }
+
+  allResults = data.results || [];
+  const tbody    = document.getElementById('results-tbody');
+  const section  = document.getElementById('results-section');
+  const empty    = document.getElementById('empty-state');
+  const countEl  = document.getElementById('results-count');
+
+  if (allResults.length === 0) {
+    section.style.display = 'none';
+    empty.style.display   = 'flex';
+    return;
+  }
+
+  empty.style.display   = 'none';
+  section.style.display = 'block';
+  countEl.textContent   = `${allResults.length} validated`;
+
+  tbody.innerHTML = allResults.map(r => {
+    const passed  = r.passed;
+    const shW     = Math.min((r.sharpe_mean / 3) * 100, 100).toFixed(0);
+    const tagCls  = passed ? 'teal' : 'red';
+    const ctype   = r.concept_type || '?';
+    const ctypeCls= ctype.includes('FVG') ? 'blue' : ctype.includes('SWEEP') ? 'amber' : 'teal';
+    return `<tr onclick="selectResult('${r.setup_id}')">
+      <td>
+        <div style="font-size:12px;font-weight:500">${r.strategy_name || r.setup_id.slice(0,12)}</div>
+        <div style="font-size:10px;color:var(--text-dim);font-family:var(--mono)">${r.setup_id.slice(0,8)}</div>
+      </td>
+      <td><span class="tag ${ctypeCls}">${ctype.slice(0,12)}</span></td>
+      <td class="mono">${r.market || '?'}</td>
+      <td class="mono">${r.timeframe || '?'}</td>
+      <td>
+        <div class="sharpe-bar">
+          <div class="sharpe-track"><div class="sharpe-fill" style="width:${shW}%"></div></div>
+          <span class="mono">${r.sharpe_mean?.toFixed(2)}</span>
+        </div>
+      </td>
+      <td class="mono">${r.calmar_mean?.toFixed(2)}</td>
+      <td class="mono" style="color:var(--amber)">${r.max_dd_mean?.toFixed(1)}%</td>
+      <td class="mono" style="color:${r.p_ruin > 3 ? 'var(--red)' : 'var(--green)'}">${r.p_ruin?.toFixed(1)}%</td>
+      <td class="mono">${r.win_rate?.toFixed(1)}%</td>
+      <td class="mono">${r.n_trades}</td>
+      <td class="mono" style="color:var(--text-dim)">${r.n_runs?.toLocaleString()}</td>
+      <td><span class="tag ${tagCls}">${passed ? 'PASSED' : 'FAILED'}</span></td>
+    </tr>`;
+  }).join('');
+
+  // Also populate the select with unvalidated strategies if not already there
+  updateSelectResults();
+}
+
+function updateSelectResults() {
+  // Mark results already in the dropdown
+  const sel = document.getElementById('strategy-select');
+  const existing = new Set([...sel.options].map(o => o.value));
+  allResults.forEach(r => {
+    if (!existing.has(r.setup_id)) {
+      const opt = document.createElement('option');
+      opt.value       = r.setup_id;
+      opt.textContent = `${(r.strategy_name || r.setup_id).slice(0, 50)}  [${r.concept_type || '?'} | ${r.market || '?'} ${r.timeframe || '?'}]  ✓`;
+      sel.appendChild(opt);
+    }
+  });
+}
+
+// ── On strategy select change ─────────────────────────────────
+function onStrategyChange() {
+  const sel = document.getElementById('strategy-select');
+  const sid = sel.value;
+  if (!sid) return;
+  const mc = allResults.find(r => r.setup_id === sid);
+  if (mc) renderResult(mc);
+  else clearDetail();
+}
+
+function selectResult(setup_id) {
+  const sel = document.getElementById('strategy-select');
+  sel.value = setup_id;
+  const mc = allResults.find(r => r.setup_id === setup_id);
+  if (mc) renderResult(mc);
+}
+
+function clearDetail() {
+  document.getElementById('verdict-banner').style.display = 'none';
+  document.getElementById('metrics-grid').style.display   = 'none';
+  document.getElementById('charts-row').style.display     = 'none';
+}
+
+// ── Render a single MC result ─────────────────────────────────
+function renderResult(r) {
+  const passed = r.passed;
+
+  // Verdict banner
+  const banner = document.getElementById('verdict-banner');
+  banner.className = `verdict-banner ${passed ? 'pass' : 'fail'}`;
+  banner.style.display = 'flex';
+  document.getElementById('verdict-badge').className   = `verdict-badge ${passed ? 'pass' : 'fail'}`;
+  document.getElementById('verdict-badge').textContent = passed ? 'MC PASSED' : 'MC FAILED';
+  document.getElementById('verdict-name').textContent  = r.strategy_name || r.setup_id;
+  document.getElementById('verdict-reason').textContent= r.verdict_reason || '—';
+  document.getElementById('verdict-meta').innerHTML    =
+    `${r.concept_type || '?'} · ${r.market || '?'} ${r.timeframe || '?'}<br>` +
+    `${(r.n_runs || 0).toLocaleString()} MC runs · ${r.n_trades} trades<br>` +
+    `${r.run_at ? new Date(r.run_at).toLocaleString() : ''}`;
+
+  // Metrics
+  document.getElementById('metrics-grid').style.display = 'grid';
+  const shColor = r.sharpe_mean >= 1.5 ? 'teal' : r.sharpe_mean >= 1.0 ? 'amber' : 'red';
+  document.getElementById('m-sharpe').textContent      = r.sharpe_mean?.toFixed(3);
+  document.getElementById('m-sharpe').className        = `metric-value ${shColor}`;
+  document.getElementById('m-sharpe-range').textContent= `p5 ${r.sharpe_p5?.toFixed(2)} — p95 ${r.sharpe_p95?.toFixed(2)}`;
+  document.getElementById('m-sharpe-p5').textContent   = r.sharpe_p5?.toFixed(3);
+  document.getElementById('m-calmar').textContent      = r.calmar_mean?.toFixed(3);
+  document.getElementById('m-maxdd').textContent       = r.max_dd_mean?.toFixed(1) + '%';
+  document.getElementById('m-maxdd-worst').textContent = `worst: ${r.max_dd_worst?.toFixed(1)}%`;
+  const pruinColor = r.p_ruin <= 3 ? 'green' : r.p_ruin <= 8 ? 'amber' : 'red';
+  document.getElementById('m-pruin').textContent  = r.p_ruin?.toFixed(2) + '%';
+  document.getElementById('m-pruin').className    = `metric-value ${pruinColor}`;
+  document.getElementById('m-wr').textContent     = r.win_rate?.toFixed(1) + '%';
+  document.getElementById('m-trades').textContent = `${r.n_trades} trades detected`;
+
+  // Charts
+  document.getElementById('charts-row').style.display = 'grid';
+  buildEquityChart(JSON.parse(r.equity_curves_json || '[]'));
+  buildSharpeChart(JSON.parse(r.sharpe_dist_json   || '{}'));
+  buildDDChart(JSON.parse(r.dd_dist_json           || '{}'));
+}
+
+// ── Chart builders ────────────────────────────────────────────
+const CHART_DEFAULTS = {
+  responsive: true, maintainAspectRatio: false,
+  plugins: { legend: { display: false },
+    tooltip: { backgroundColor:'#151821', borderColor:'rgba(255,255,255,0.08)',
+               borderWidth:1, titleColor:'#5a6478', bodyColor:'#00c896',
+               titleFont:{family:'IBM Plex Mono',size:10},
+               bodyFont:{family:'IBM Plex Mono',size:11} } },
+  scales: {
+    x: { display:false },
+    y: { grid:{ color:'rgba(255,255,255,0.03)', drawBorder:false },
+         ticks:{ color:'#5a6478', font:{family:'IBM Plex Mono',size:9} } }
+  }
+};
+
+function buildEquityChart(curves) {
+  const ctx = document.getElementById('equity-chart');
+  if (!ctx || !curves?.length) return;
+  if (equityChart) equityChart.destroy();
+
+  const labels = curves[0]?.map((_, i) => i) || [];
+  const datasets = curves.map((eq, i) => ({
+    data: eq, borderColor: i === 0 ? '#00c896' : `rgba(0,200,150,${0.08 + i * 0.01})`,
+    borderWidth: i === 0 ? 1.5 : 0.8, fill: false,
+    tension: 0.3, pointRadius: 0,
+  }));
+
+  equityChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      ...CHART_DEFAULTS,
+      scales: {
+        ...CHART_DEFAULTS.scales,
+        y: { ...CHART_DEFAULTS.scales.y, ticks: { ...CHART_DEFAULTS.scales.y.ticks,
+          callback: v => v.toFixed(0) } }
+      }
+    }
+  });
+}
+
+function buildHistChart(canvasId, dist, color, labelFmt, chartRef, setter) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx || !dist?.counts) return;
+  if (chartRef) chartRef.destroy();
+
+  const labels = dist.edges.slice(0, -1).map(e => labelFmt(e));
+  const chart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ data: dist.counts, backgroundColor: color,
+                   borderColor: 'transparent', borderRadius: 2 }]
+    },
+    options: {
+      ...CHART_DEFAULTS,
+      scales: {
+        x: { display: true, ticks: { color:'#5a6478', font:{family:'IBM Plex Mono',size:8},
+               maxTicksLimit: 6, maxRotation: 0 } },
+        y: { ...CHART_DEFAULTS.scales.y }
+      }
+    }
+  });
+  setter(chart);
+}
+
+function buildSharpeChart(dist) {
+  buildHistChart('sharpe-chart', dist, 'rgba(77,159,255,0.6)',
+    e => e.toFixed(1), sharpeChart, c => sharpeChart = c);
+}
+function buildDDChart(dist) {
+  buildHistChart('dd-chart', dist, 'rgba(245,166,35,0.6)',
+    e => e.toFixed(1) + '%', ddChart, c => ddChart = c);
+}
+
+// ── Run MC validation ─────────────────────────────────────────
+async function runValidation() {
+  const sid  = document.getElementById('strategy-select').value;
+  const runs = parseInt(document.getElementById('runs-input').value) || 2000;
+  if (!sid) { showToast('Select a strategy', 'Choose a strategy from the dropdown first', 'amber'); return; }
+
+  const btn    = document.getElementById('run-btn');
+  const status = document.getElementById('run-status');
+  btn.disabled = true;
+  status.className   = 'run-status running';
+  status.textContent = 'Spawning validator subprocess…';
+
+  const resp = await api(`/api/validate/${sid}?runs=${runs}`, { method: 'POST' });
+  if (!resp || resp.status === 'error') {
+    status.className   = 'run-status error';
+    status.textContent = resp?.detail || 'Failed to start validator';
+    btn.disabled = false;
+    return;
+  }
+
+  status.textContent = `Running ${runs.toLocaleString()} MC iterations…`;
+  showToast('MC Started', `Validating ${sid.slice(0,8)} — ${runs.toLocaleString()} iterations`, 'teal');
+
+  // Poll for results
+  let attempts = 0;
+  const poll = setInterval(async () => {
+    attempts++;
+    const data = await api(`/api/validate/${sid}`);
+    if (data?.result) {
+      clearInterval(poll);
+      btn.disabled       = false;
+      status.className   = 'run-status done';
+      status.textContent = 'Done';
+
+      // Update allResults and re-render
+      allResults = allResults.filter(r => r.setup_id !== sid);
+      allResults.unshift(data.result);
+      await loadAllResults();
+      renderResult(data.result);
+      showToast(
+        data.result.passed ? 'MC Passed ✓' : 'MC Failed ✗',
+        `Sharpe ${data.result.sharpe_mean?.toFixed(2)} | Calmar ${data.result.calmar_mean?.toFixed(2)} | P(ruin) ${data.result.p_ruin?.toFixed(1)}%`,
+        data.result.passed ? 'teal' : 'amber'
+      );
+    }
+    if (attempts > 60) {   // 3 min timeout
+      clearInterval(poll);
+      btn.disabled       = false;
+      status.className   = 'run-status error';
+      status.textContent = 'Timeout — check backend logs';
+    }
+  }, 3000);
+}
+
+// ── Toast ─────────────────────────────────────────────────────
+function showToast(title, msg, type = 'teal') {
+  const icons = { teal:'✓', amber:'⚡', red:'⚠', blue:'ℹ' };
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `
+    <div class="toast-icon">${icons[type]||'•'}</div>
+    <div class="toast-body"><div class="toast-title">${title}</div><div class="toast-msg">${msg}</div></div>
+    <div class="toast-close" onclick="this.parentElement.remove()">×</div>
+  `;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => { el.classList.add('fadeOut'); setTimeout(() => el.remove(), 300); }, 5000);
+}
+
+// ── Init ──────────────────────────────────────────────────────
+checkConn();
+loadStrategies();
+loadAllResults();
+setInterval(checkConn, 30000);
+</script>
+</body>
+</html>
